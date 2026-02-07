@@ -7,7 +7,7 @@
     "compile": "tsc -p tsconfig.electron.json",
     "compile:watch": "tsc -p tsconfig.electron.json -w",
 
-    "prebuild": "npm run compile:watch",
+    "precompile": "npm run compile:watch",
     "clean": "rm -rf compile-electron dist",
     
     "start": "electron . --no-sandbox",

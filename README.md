@@ -6,15 +6,12 @@ Este proyecto utiliza **Electron**, **React**, **TypeScript** y **Vite** para cr
 
 ```
 deepsaffix-cliente/
-├── electron/                    # Código del proceso principal de Electron
+├── electron/                   # Código del proceso principal de Electron
+├   ├── dist/                   # Build de React (generado)
 │   ├── main.ts                 # Punto de entrada principal de Electron
-│   └── preload.ts              # Scripts de pre-carga
-├── src/                        # Aplicación React
+│   └── preload.ts              # Scripts de pre-carga (opcional)
 ├── dist-electron/              # Código compilado de Electron (generado)
-├── dist/                       # Build de React (generado)
 ├── release/                    # Aplicaciones empaquetadas (generado)
-├── index.html                  # Punto de entrada HTML
-├── vite.config.ts              # Configuración de Vite
 ├── tsconfig.electron.json      # Configuración TypeScript para Electron
 ├── tsconfig.json               # Configuración TypeScript para React
 ├── electron-builder.json       # Configuración para empaquetado
@@ -31,8 +28,8 @@ deepsaffix-cliente/
 
 ### 1. Clonar el repositorio
 ```bash
-git clone https://github.com/Grupo-2-DPM/DeepSaffix-CLIENTE.git
-cd deepsaffix-cliente
+git clone https://github.com/Grupo-2-DPM/DeepSaffix-DESKTOP.git
+cd deepsaffix-desktop
 ```
 
 ### 2. Instalar dependencias
@@ -40,7 +37,7 @@ cd deepsaffix-cliente
 npm install
 ```
 
-### 3. Instalar dependencias de desarrollo
+### 3. Instalar dependencias de desarrollo (Si no funciona)
 ```bash
 npm install --save-dev electron typescript @types/node @types/electron
 npm install --save-dev concurrently wait-on electron-builder
@@ -50,34 +47,23 @@ npm install --save-dev concurrently wait-on electron-builder
 
 ### Desarrollo
 ```bash
-# Iniciar servidor de desarrollo Vite + Electron (recomendado)
-npm run dev:all
+# Iniciar servidor de desarrollo Electron (recomendado)
+npm run dev
 
-# O ejecutar por separado:
-npm run dev                     # Iniciar solo Vite (React)
-npm run build:electron          # Compilar Electron
-npm run electron                # Iniciar solo Electron
+npm run precompile:electron        # Compilar Electron
 ```
 
 ### Build y Producción
 ```bash
-# Build completo para producción
-npm run build:all               # Build de React + Electron
 
 # Empaquetar aplicación (genera ejecutables en /release)
-npm run package                 # Para sistema operativo actual
-npm run package:linux           # Para Linux
-npm run package:win             # Para Windows
-npm run package:mac             # Para macOS
+npm run build                 # Para sistema operativo actual
+npm run build:linux           # Para Linux
+npm run build:win             # Para Windows
+npm run build:mac             # Para macOS
 
-# Ejecutar en modo producción (después de build)
+# Ejecutar en modo producción (después de precompile)
 npm start                       # Ejecutar desde archivos compilados
-```
-
-### Linting y Testing
-```bash
-npm run lint                    # Verificar código con ESLint
-npm test                        # Ejecutar pruebas (si están configuradas)
 ```
 
 ## Configuración Técnica
@@ -88,22 +74,16 @@ npm test                        # Ejecutar pruebas (si están configuradas)
 ```json
 {
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "lib": ["ES2022", "DOM"],
-    "outDir": "./dist-electron",
+    "target": "ES2020",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "outDir": "./compile-electron",
     "rootDir": "./electron",
     "strict": true,
     "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "allowSyntheticDefaultImports": true,
-    "isolatedModules": true
+    "skipLibCheck": true
   },
-  "include": ["electron/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["electron/**/*"]
 }
 ```
 
@@ -111,37 +91,30 @@ npm test                        # Ejecutar pruebas (si están configuradas)
 ```json
 {
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview",
-    "build:electron": "tsc -p tsconfig.electron.json",
-    "electron": "electron . --no-sandbox",
-    "dev:electron": "concurrently -k \"npm run dev\" \"npm run build:electron && wait-on tcp:5173 && npm run electron\"",
-    "dev:all": "npm run dev:electron",
-    "build:all": "npm run build && npm run build:electron",
-    "package": "npm run build:all && electron-builder",
-    "package:linux": "npm run build:all && electron-builder --linux",
-    "package:win": "npm run build:all && electron-builder --win",
-    "package:mac": "npm run build:all && electron-builder --mac"
-  }
+    "compile": "tsc -p tsconfig.electron.json",
+    "compile:watch": "tsc -p tsconfig.electron.json -w",
+
+    "precompile": "npm run compile:watch",
+    "clean": "rm -rf compile-electron dist",
+    
+    "start": "electron . --no-sandbox",
+    "dev": "concurrently -k -n \"TS,ELC\" -c \"blue,green\" \"npm run compile:watch\" \"wait-on compile-electron/main.js && npm run start\"",
+
+    "build": "electron-builder",
+    "build:linux": "npm run build -- --linux",
+    "build:win": "npm run build -- --win",
+    "build:mac": "npm run build -- --mac"
+  },
 }
 ```
 
 #### **3. `electron/main.ts`** (Punto de entrada principal)
 ```typescript
 import { app, BrowserWindow } from 'electron';
-import path from 'path';
-import { fileURLToPath } from 'url';
+const path = require('path');
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-let mainWindow: BrowserWindow | null = null;
-const isDev = process.env.NODE_ENV === 'development';
-
-async function createWindow(): Promise<void> {
-  mainWindow = new BrowserWindow({
+function createWindow(): void {
+  const win = new BrowserWindow({
     width: 1200,
     height: 800,
     webPreferences: {
@@ -150,17 +123,12 @@ async function createWindow(): Promise<void> {
     }
   });
 
-  if (isDev) {
-    mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools();
-  } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
-  }
+  win.setTitle('My App');
+  win.loadFile(path.join(__dirname, 'dist/index.html'));
+  win.webContents.openDevTools();
 }
 
-app.whenReady().then(() => {
-  createWindow();
-});
+app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
@@ -169,6 +137,8 @@ app.on('window-all-closed', () => {
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
+
+export {}; // Asegura que sea tratado como módulo
 ```
 
 #### **4. `electron/preload.ts`** (Comunicación segura)
@@ -182,52 +152,36 @@ contextBridge.exposeInMainWorld('electronAPI', {
 });
 ```
 
-#### **5. `vite.config.ts`** (Configuración de Vite)
-```typescript
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
 
-export default defineConfig({
-  plugins: [react()],
-  base: './',  // Importante para rutas relativas en Electron
-  build: {
-    outDir: 'dist',
-    emptyOutDir: true,
-    target: 'esnext'
-  },
-  server: {
-    port: 5173,
-    strictPort: true
-  }
-});
-```
-
-#### **6. `electron-builder.json`** (Configuración de empaquetado)
+#### **5. `electron-builder.json`** (Configuración de empaquetado)
 ```json
 {
-  "appId": "com.deepsaffix.cliente",
-  "productName": "DeepSaffix Cliente",
-  "directories": {
-    "output": "release"
-  },
-  "files": [
-    "dist/**/*",
-    "dist-electron/**/*",
-    "node_modules/**/*"
-  ],
-  "linux": {
-    "target": ["AppImage", "deb", "rpm", "snap"],
-    "category": "Utility",
-    "icon": "public/icon.png"
-  },
-  "win": {
-    "target": ["nsis", "portable"],
-    "icon": "public/icon.ico"
-  },
-  "mac": {
-    "target": ["dmg", "zip"],
-    "category": "public.app-category.utilities",
-    "icon": "public/icon.icns"
+  {
+    "appId": "com.deepsaffix.cliente",
+    "productName": "DeepSaffix Cliente",
+    "directories": {
+      "output": "release",
+      "buildResources": "public"
+    },
+    "files": [
+      "dist/**/*",
+      "compile-electron/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Utility",
+      "maintainer": "Gerbetwo <lassomoluna9@gmail.com>"
+    },
+    "win": {
+      "target": ["nsis", "portable"],
+      "icon": "public/icon.ico"
+    },
+    "mac": {
+      "target": ["dmg"],
+      "category": "public.app-category.utilities"
+    }
   }
 }
 ```
@@ -290,16 +244,13 @@ sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
 
 2. **Construir la aplicación:**
 ```bash
-# Build completo
-npm run build:all
-
 # Empaquetar para tu sistema
-npm run package
+npm run build
 
 # Empaquetar específico
-npm run package:linux
-npm run package:win
-npm run package:mac
+npm run build:linux
+npm run build:win
+npm run build:mac
 ```
 
 3. **Los ejecutables** se generan en `/release/`
