@@ -25,7 +25,7 @@ dist-ssr
 
 # Enviroments
 .env
-
+compile-electron
 dist-electron
 dist-electron-dev
 
