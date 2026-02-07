@@ -214,15 +214,7 @@ sudo chown root node_modules/electron/dist/chrome-sandbox
 sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
 ```
 
-### 3. **Electron no se conecta a Vite en desarrollo**
-**Solución:** Verificar que:
-1. Vite esté corriendo en puerto 5173
-2. El script `dev:electron` espere correctamente:
-```json
-"wait-on tcp:5173 && npm run electron"
-```
-
-### 4. **Errores de TypeScript con import.meta**
+### 3. **Errores de TypeScript con import.meta**
 **Solución:** Configurar TypeScript correctamente:
 ```json
 {
@@ -296,57 +288,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   }
 });
 ```
-
-## Configuración de Desarrollo Avanzada
-
-### Hot Reload con electron-reloader
-```bash
-npm install --save-dev electron-reloader
-```
-
-**En main.ts:**
-```typescript
-import { app, BrowserWindow } from 'electron';
-
-// Solo en desarrollo
-if (process.env.NODE_ENV === 'development') {
-  try {
-    const { default: reload } = await import('electron-reloader');
-    reload(module, {
-      debug: true,
-      watchRenderer: true
-    });
-  } catch {}
-}
-```
-
-### Variables de entorno
-Crear `.env`:
-```env
-VITE_APP_NAME=DeepSaffix
-VITE_API_URL=http://localhost:3000
-```
-
-**En Vite/React:**
-```typescript
-const apiUrl = import.meta.env.VITE_API_URL;
-```
-
-### Configurar alias en Vite
-```typescript
-import path from 'path';
-
-export default defineConfig({
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-      '@components': path.resolve(__dirname, './src/components'),
-      '@assets': path.resolve(__dirname, './src/assets')
-    }
-  }
-});
-```
-
 ## Recursos Adicionales
 
 - [Documentación oficial de Electron](https://www.electronjs.org/docs)
