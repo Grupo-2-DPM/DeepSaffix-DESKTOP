@@ -1,24 +1,29 @@
 {
   "name": "deepsaffix-cliente",
-  "private": true,
   "version": "0.0.0",
-  "type": "module",
   "author": "Gerbetwo <lassomoluna9@gmail.com>",
-  "main": "dist-electron/main.js",
+  "main": "compile-electron/main.js",
   "scripts": {
-    "compile:electron": "tsc -p tsconfig.electron.json",
-    "dev": "concurrently -k \"npm run dev\" \"npm run compile:electron",
-    "dev:electron": "electron . --no-sandbox",
-    "build:linux": "npm run compile:electron && electron-builder --linux",
-    "build:win": "npm run compile:electron && electron-builder --win",
-    "build:mac": "npm run compile:electron && electron-builder --mac"
-  },
-  "dependencies": {
-    "react": "^19.2.0"
+    "compile": "tsc -p tsconfig.electron.json",
+    "compile:watch": "tsc -p tsconfig.electron.json -w",
+
+    "prebuild": "npm run compile:watch",
+    "clean": "rm -rf compile-electron dist",
+    
+    "start": "electron . --no-sandbox",
+    "dev": "concurrently -k -n \"TS,ELC\" -c \"blue,green\" \"npm run compile:watch\" \"wait-on compile-electron/main.js && npm run start\"",
+
+    "build": "electron-builder",
+    "build:linux": "npm run build -- --linux",
+    "build:win": "npm run build -- --win",
+    "build:mac": "npm run build -- --mac"
   },
   "devDependencies": {
     "@types/electron": "^1.4.38",
     "@types/node": "^24.10.9",
-    "electron": "^40.1.0"
+    "concurrently": "^9.2.1",
+    "electron": "^40.1.0",
+    "typescript": "^5.9.3",
+    "wait-on": "^9.0.3"
   }
 }
