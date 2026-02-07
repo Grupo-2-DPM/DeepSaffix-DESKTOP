@@ -1,9 +1,8 @@
 import { app, BrowserWindow } from 'electron';
-
-let mainWindow: BrowserWindow | null = null;
+const path = require('path');
 
 function createWindow(): void {
-  mainWindow = new BrowserWindow({
+  const win = new BrowserWindow({
     width: 1200,
     height: 800,
     webPreferences: {
@@ -12,8 +11,9 @@ function createWindow(): void {
     }
   });
 
-  mainWindow.loadURL('http://localhost:5173');
-  mainWindow.webContents.openDevTools();
+  win.setTitle('My App');
+  win.loadFile(path.join(__dirname, 'client-dist/index.html'));
+  win.webContents.openDevTools();
 }
 
 app.whenReady().then(createWindow);
