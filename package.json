@@ -6,19 +6,12 @@
   "author": "Gerbetwo <lassomoluna9@gmail.com>",
   "main": "dist-electron/main.js",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview",
-    "build:electron": "tsc -p tsconfig.electron.json",
-    "electron": "electron . --no-sandbox",
-    "dev:electron": "concurrently -k \"npm run dev\" \"npm run build:electron && wait-on tcp:5173 && npm run electron\"",
-    "dev:all": "npm run dev:electron",
-    "build:all": "npm run build && npm run build:electron",
-    "package": "npm run build:all && electron-builder",
-    "package:linux": "npm run build:all && electron-builder --linux",
-    "package:win": "npm run build:all && electron-builder --win",
-    "package:mac": "npm run build:all && electron-builder --mac"
+    "compile:electron": "tsc -p tsconfig.electron.json",
+    "dev": "concurrently -k \"npm run dev\" \"npm run compile:electron",
+    "dev:electron": "electron . --no-sandbox",
+    "build:linux": "npm run compile:electron && electron-builder --linux",
+    "build:win": "npm run compile:electron && electron-builder --win",
+    "build:mac": "npm run compile:electron && electron-builder --mac"
   },
   "dependencies": {
     "react": "^19.2.0",
