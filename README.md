@@ -1,6 +1,6 @@
-# DeepSaffix - Cliente Electron + React + Vite
+# DeepSaffix - Cliente Electron
 
-Este proyecto utiliza **Electron**, **React**, **TypeScript** y **Vite** para crear una aplicación de escritorio multiplataforma.
+Este proyecto utiliza **Electron** y **TypeScript**para crear una aplicación de escritorio multiplataforma.
 
 ## Estructura del Proyecto
 
