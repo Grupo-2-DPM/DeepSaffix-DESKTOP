@@ -28,6 +28,9 @@ jobs:
 
       - name: Build Electron App
         run: npm run build # Asegúrate de que este comando genere el dist
+        env:
+          # GitHub ya crea este token automáticamente, solo hay que pasarlo
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
       - name: Publish Release
         uses: samuelmeuli/action-electron-builder@v1
