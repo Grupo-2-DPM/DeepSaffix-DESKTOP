@@ -1,22 +1,17 @@
-name: Build and Release Electron App
+name: Build and Release
 
 on:
   push:
     tags:
-      - 'v*' # Se activa cuando subes un tag como v1.0.0
+      - 'v*'
 
+# ESTO ES LO QUE SOLUCIONA EL ERROR 404
 permissions:
-  contents: write # Permite crear releases y subir archivos
+  contents: write
 
 jobs:
-  release:
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      matrix:
-        # Puedes añadir 'macos-latest' o 'windows-latest' según necesites
-        os: [windows-latest] 
-
+  build:
+    runs-on: windows-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -29,14 +24,8 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build Electron App
-        run: npm run build # Asegúrate de que este comando genere el dist
+      - name: Build and Publish
+        # Usamos --publish always para forzar la subida
+        run: npm run build -- --publish always
         env:
-          # GitHub ya crea este token automáticamente, solo hay que pasarlo
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
-      - name: Publish Release
-        uses: samuelmeuli/action-electron-builder@v1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          release: true
