@@ -23,5 +23,10 @@
   "mac": {
     "target": ["dmg"],
     "category": "public.app-category.utilities"
-  }
+  },
+  "publish": [{
+    "provider": "github",
+    "owner": "Gebertwo-github",
+    "repo": "DeepSaffix-DESKTOP"
+  }]
 }

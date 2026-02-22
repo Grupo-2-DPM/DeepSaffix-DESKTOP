@@ -1,0 +1,36 @@
+name: Build and Release Electron App
+
+on:
+  push:
+    tags:
+      - 'v*' # Se activa cuando subes un tag como v1.0.0
+
+jobs:
+  release:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        # Puedes añadir 'macos-latest' o 'windows-latest' según necesites
+        os: [windows-latest] 
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Electron App
+        run: npm run build # Asegúrate de que este comando genere el dist
+        
+      - name: Publish Release
+        uses: samuelmeuli/action-electron-builder@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          release: true
