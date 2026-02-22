@@ -6,14 +6,16 @@
   "scripts": {
     "compile": "tsc -p tsconfig.electron.json",
     "compile:watch": "tsc -p tsconfig.electron.json -w",
-    "precompile": "npm run compile:watch",
-    "clean": "rm -rf compile-electron dist",
+    
+    "clean": "rimraf compile-electron dist",
     "start": "electron . --no-sandbox",
     "dev": "concurrently -k -n \"TS,ELC\" -c \"blue,green\" \"npm run compile:watch\" \"wait-on compile-electron/main.js && npm run start\"",
+
     "build": "npm run compile && electron-builder",
-    "build:linux": "npm run build -- --linux",
-    "build:win": "npm run build -- --win",
-    "build:mac": "npm run build -- --mac"
+
+    "build:linux": "npm run compile && electron-builder --linux",
+    "build:win": "npm run compile && electron-builder --win",
+    "build:mac": "npm run compile && electron-builder --mac"
   },
   "devDependencies": {
     "@types/electron": "^1.4.38",
