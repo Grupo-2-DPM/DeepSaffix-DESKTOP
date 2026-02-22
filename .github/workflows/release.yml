@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*' # Se activa cuando subes un tag como v1.0.0
 
+permissions:
+  contents: write # Permite crear releases y subir archivos
+
 jobs:
   release:
     runs-on: ${{ matrix.os }}
