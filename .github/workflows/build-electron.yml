@@ -1,36 +1,51 @@
-name: Protocolo Nexus - Build Electron
+name: Build DeepSaffix Cliente (Multi-Platform)
 
 on:
   repository_dispatch:
-    types: [frontend-updated] # Se activa con la señal del repo WEB
+    types: [frontend-updated]
 
 jobs:
-  build-desktop:
+  release:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        # Usamos ubuntu para Linux y windows para Windows
+        include:
+          - os: ubuntu-latest
+            target: --linux
+          - os: windows-latest
+            target: --win
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'npm'
 
-      - name: Download Frontend from WEB Repo
+      # Descargar el frontend del repo WEB
+      - name: Download Frontend
         uses: dawidd6/action-download-artifact@v6
         with:
           github_token: ${{ secrets.ACTION_TOKEN }}
-          workflow: main.yml # Debe coincidir con el nombre del archivo en el repo WEB
+          workflow: main.yml
           name: frontend-dist
           repo: Grupo-2-DPM/DeepSaffix-WEB
           path: dist
 
-      - name: Install & Build Electron
-        run: |
-          npm install
-          npm run build  -- --publish always 
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Electron App
+        # Usamos el target específico según el sistema operativo
+        run: npm run compile && npx electron-builder ${{ matrix.target }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: DeepSaffix-Build-${{ matrix.os }}
+          path: release/*
