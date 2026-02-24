@@ -1,18 +1,17 @@
 {
   "name": "deepsaffix-cliente",
-  "version": "0.0.0",
+  "version": "1.0.8",
+  "description": "DeepSaffix Desktop Application",
+  "repository": "https://github.com/Grupo-2-DPM/DeepSaffix-DESKTOP/",
   "author": "Gerbetwo <lassomoluna9@gmail.com>",
   "main": "compile-electron/main.js",
   "scripts": {
     "compile": "tsc -p tsconfig.electron.json",
     "compile:watch": "tsc -p tsconfig.electron.json -w",
-    
     "clean": "rimraf compile-electron dist",
     "start": "electron . --no-sandbox",
     "dev": "concurrently -k -n \"TS,ELC\" -c \"blue,green\" \"npm run compile:watch\" \"wait-on compile-electron/main.js && npm run start\"",
-
     "build": "npm run compile && electron-builder",
-
     "build:linux": "npm run compile && electron-builder --linux",
     "build:win": "npm run compile && electron-builder --win",
     "build:mac": "npm run compile && electron-builder --mac"

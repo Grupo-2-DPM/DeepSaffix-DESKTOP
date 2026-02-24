@@ -12,21 +12,31 @@
   ],
   "asar": true,
   "linux": {
-    "target": ["AppImage", "deb"],
+    "target": [
+      "AppImage",
+      "deb"
+    ],
     "category": "Utility",
     "maintainer": "Gerbetwo <lassomoluna9@gmail.com>"
   },
   "win": {
-    "target": ["nsis", "portable"],
+    "target": [
+      "nsis",
+      "portable"
+    ],
     "icon": "public/icon.ico"
   },
   "mac": {
-    "target": ["dmg"],
+    "target": [
+      "dmg"
+    ],
     "category": "public.app-category.utilities"
   },
-  "publish": [{
-    "provider": "github",
-    "owner": "Gebertwo-github",
-    "repo": "DeepSaffix-DESKTOP"
-  }]
+  "publish": [
+    {
+      "provider": "github",
+      "owner": "Grupo-2-DPM",
+      "repo": "DeepSaffix-DESKTOP"
+    }
+  ]
 }
