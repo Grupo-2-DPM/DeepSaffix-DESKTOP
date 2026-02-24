@@ -25,7 +25,6 @@ jobs:
         run: npm install
 
       - name: Build and Publish
-        # Usamos --publish always para forzar la subida
-        run: npm run build -- --publish always
+        run: npm run build -- --publish always -c.publish.releaseType=release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

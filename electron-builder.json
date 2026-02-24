@@ -36,7 +36,8 @@
     {
       "provider": "github",
       "owner": "Grupo-2-DPM",
-      "repo": "DeepSaffix-DESKTOP"
+      "repo": "DeepSaffix-DESKTOP",
+      "releaseType": "release"
     }
   ]
 }
