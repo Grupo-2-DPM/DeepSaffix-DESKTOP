@@ -11,7 +11,7 @@
     "clean": "rimraf compile-electron dist",
     "start": "electron . --no-sandbox",
     "dev": "concurrently -k -n \"TS,ELC\" -c \"blue,green\" \"npm run compile:watch\" \"wait-on compile-electron/main.js && npm run start\"",
-    "build": "npm run compile && electron-builder",
+    "build": "npm run compile && electron-builder --linux && electron-builder --win && electron-builder --mac",
     "build:linux": "npm run compile && electron-builder --linux",
     "build:win": "npm run compile && electron-builder --win",
     "build:mac": "npm run compile && electron-builder --mac"
