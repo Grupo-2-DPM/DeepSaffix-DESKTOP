@@ -1,0 +1,42 @@
+name: Build DeepSaffix Cliente (Multi-Platform)
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'dist/**' # Solo se dispara si cambia el frontend o el código desktop
+      - 'compile-electron/**'
+      - 'package.json'
+
+jobs:
+  release:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        # Build para Linux y Windows (puedes añadir macos-latest si tienes cuenta Apple)
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Electron App
+        # Esto ejecuta 'npm run compile' y 'electron-builder' según tus scripts
+        run: npm run build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: DeepSaffix-Build-${{ matrix.os }}
+          path: release/*
