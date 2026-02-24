@@ -19,15 +19,14 @@ jobs:
         with:
           node-version: 20
 
-      # DESCARGAR ARTEFACTO DESDE EL OTRO REPO
       - name: Download Frontend from WEB Repo
         uses: dawidd6/action-download-artifact@v6
         with:
           github_token: ${{ secrets.ACTION_TOKEN }}
-          workflow: main.yml # Nombre del archivo yml del repo WEB
+          workflow: main.yml # Debe coincidir con el nombre del archivo en el repo WEB
           name: frontend-dist
           repo: Grupo-2-DPM/DeepSaffix-WEB
-          path: dist # Lo pone directamente donde Electron lo necesita
+          path: dist
 
       - name: Install & Build Electron
         run: |
