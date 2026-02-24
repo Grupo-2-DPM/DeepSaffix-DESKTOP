@@ -1,0 +1,64 @@
+name: DeepSaffix Nexus - Production Build
+
+on:
+  # Se activa cuando el repo WEB envía la señal
+  repository_dispatch:
+    types: [frontend-updated]
+  # Se activa cuando tú creas un tag manualmente (ej: v1.0.17)
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: --linux
+          - os: windows-latest
+            target: --win
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      # 1. Intentar descargar el frontend más reciente del repo WEB
+      # Si fallara (por ejemplo, si el tag es muy viejo), usa el dist que esté en el repo
+      - name: Download Frontend Artifact
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          github_token: ${{ secrets.ACTION_TOKEN }}
+          workflow: main.yml
+          name: frontend-dist
+          repo: Grupo-2-DPM/DeepSaffix-WEB
+          path: dist
+        continue-on-error: true # No detiene la build si no encuentra el artefacto
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build and Publish Electron
+        # Ejecutamos compilación y lanzamos builder solo para el target de la matriz
+        # Usamos '--publish always' para que cree el Release en GitHub automáticamente
+        run: |
+          npm run compile
+          npx electron-builder ${{ matrix.target }} --publish always
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Safety Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: DeepSaffix-Binaries-${{ matrix.os }}
+          path: release/*
