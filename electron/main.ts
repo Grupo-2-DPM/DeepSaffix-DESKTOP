@@ -29,4 +29,4 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
 
-export {}; // Asegura que sea tratado como módulo
+export {};
