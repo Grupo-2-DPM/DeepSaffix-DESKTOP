@@ -11,7 +11,7 @@ function createWindow(): void {
     }
   });
 
-  win.setTitle('My App');
+  win.setTitle('DeepSaffix');
   win.loadFile(path.join(__dirname, '../dist/index.html'));
   win.webContents.openDevTools();
 }
