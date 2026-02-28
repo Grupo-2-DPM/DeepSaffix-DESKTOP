@@ -1,0 +1,48 @@
+name: Manual Tag Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Se activa cuando subes un tag que empieza con 'v' (ej: v1.0.1)
+
+jobs:
+  manual-build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      # 1. SINCRONIZAR VERSIÓN CON EL TAG
+      # Si el tag es v1.2.3, el package.json se actualizará a 1.2.3
+      - name: Sync version with Tag
+        shell: bash
+        run: |
+          # Extrae el número del tag (quita la 'v')
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          echo "Publicando versión manual: $TAG_VERSION"
+          npm version $TAG_VERSION --no-git-tag-version --allow-same-version
+
+      # 2. INSTALAR Y COMPILAR
+      # Nota: Aquí asumo que ya tienes el 'dist' (frontend) en el repo 
+      # o que vas a usar el último disponible.
+      - name: Install and Compile
+        run: |
+          npm install
+          npm run compile
+
+      # 3. PUBLICAR RELEASE OFICIAL
+      - name: Build and Publish
+        run: |
+          npx electron-builder --${{ matrix.os == 'windows-latest' && 'win' || 'linux' }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.ACTION_TOKEN }}
