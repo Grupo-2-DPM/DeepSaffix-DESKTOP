@@ -82,10 +82,3 @@ jobs:
             -c.publish.update-info-filename=latest.yml
         env:
           GH_TOKEN: ${{ secrets.ACTION_TOKEN }}
-
-      # 4. (OPCIONAL) SUBIR BINARIOS COMO ARTEFACTOS DE ACCIÓN
-      - name: Upload Binaries to Actions
-        uses: actions/upload-artifact@v4
-        with:
-          name: DeepSaffix-Binaries-${{ matrix.os }}
-          path: release/*.${{ matrix.os == 'windows-latest' && 'exe' || 'AppImage' }}
