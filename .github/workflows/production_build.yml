@@ -55,7 +55,7 @@ jobs:
           npm run compile
           npx electron-builder ${{ matrix.target }} --publish always
         env:
-          GITHUB_TOKEN: ${{ secrets.ACTION_TOKEN }}
+          GH_TOKEN: ${{ secrets.ACTION_TOKEN }}
 
       - name: Upload Safety Artifacts
         uses: actions/upload-artifact@v4
