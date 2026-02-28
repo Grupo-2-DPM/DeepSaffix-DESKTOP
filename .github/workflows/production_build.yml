@@ -1,10 +1,8 @@
 name: DeepSaffix Nexus - Production Build
 
 on:
-  # Se activa cuando el repo WEB envía la señal
   repository_dispatch:
     types: [frontend-updated]
-  # Se activa cuando tú creas un tag manualmente (ej: v1.0.17)
   push:
     tags:
       - 'v*'
@@ -33,9 +31,32 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      # 1. Intentar descargar el frontend más reciente del repo WEB
-      # Si fallara (por ejemplo, si el tag es muy viejo), usa el dist que esté en el repo
-      - name: Download Frontend Artifact
+      # 1. Crear una versión única si esto viene del Frontend (Dispatch)
+      # Esto evita que electron-builder falle por intentar publicar versiones duplicadas
+      - name: Set Dynamic Version (Only for Dispatch)
+        if: github.event_name == 'repository_dispatch'
+        shell: bash
+        run: |
+          # Extraemos la versión actual del package.json y le añadimos un sufijo con el número de ejecución
+          VERSION=$(node -p "require('./package.json').version")
+          npm version $VERSION-beta.${{ github.run_number }} --no-git-tag-version
+          echo "Building new beta release: $VERSION-beta.${{ github.run_number }}"
+
+      # 2. Descargar el artefacto EXACTO usando el run_id enviado por el repo WEB
+      - name: Download Frontend Artifact (From Dispatch)
+        if: github.event_name == 'repository_dispatch'
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          github_token: ${{ secrets.ACTION_TOKEN }}
+          workflow: main.yml
+          run_id: ${{ github.event.client_payload.run_id }}
+          name: frontend-dist
+          repo: Grupo-2-DPM/DeepSaffix-WEB
+          path: dist
+
+      # 3. Descargar el último artefacto disponible (Fallback si creas un Tag manual 'v1.x.x')
+      - name: Download Frontend Artifact (Manual Tag)
+        if: github.event_name == 'push'
         uses: dawidd6/action-download-artifact@v6
         with:
           github_token: ${{ secrets.ACTION_TOKEN }}
@@ -43,22 +64,15 @@ jobs:
           name: frontend-dist
           repo: Grupo-2-DPM/DeepSaffix-WEB
           path: dist
-        continue-on-error: true # No detiene la build si no encuentra el artefacto
+        continue-on-error: true
 
       - name: Install Dependencies
         run: npm install
 
+      # 4. Construir y Publicar
       - name: Build and Publish Electron
-        # Ejecutamos compilación y lanzamos builder solo para el target de la matriz
-        # Usamos '--publish always' para que cree el Release en GitHub automáticamente
         run: |
           npm run compile
           npx electron-builder ${{ matrix.target }} --publish always
         env:
           GH_TOKEN: ${{ secrets.ACTION_TOKEN }}
-
-      - name: Upload Safety Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: DeepSaffix-Binaries-${{ matrix.os }}
-          path: release/*
