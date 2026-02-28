@@ -1,4 +1,4 @@
-name: DeepSaffix Nexus - Production Build
+name: DeepSaffix Nexus - Production Build (Auto-Latest)
 
 on:
   repository_dispatch:
@@ -14,6 +14,7 @@ jobs:
   build-and-deploy:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false # Para que si falla Linux, Windows siga compilando
       matrix:
         include:
           - os: ubuntu-latest
@@ -24,59 +25,67 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
-      # --- ESTE ES EL PASO CLAVE ---
-      - name: Auto-update Version in package.json
+
+      # 1. ACTUALIZACIÓN AUTOMÁTICA DE VERSIÓN (OPCIÓN 1 PROFESIONAL)
+      # Esto evita que tengas que cambiar el package.json a mano.
+      # Usamos la fecha y el run_number para asegurar que siempre sea mayor a la anterior.
+      - name: Auto-update Version
         shell: bash
         run: |
-          # 1. Extraer la versión base (ej. 1.0.19)
+          # Extraer versión base (ej: 1.0.0)
           BASE_VERSION=$(node -p "require('./package.json').version.split('-')[0]")
-          
-          # 2. Crear una nueva versión usando el ID de la ejecución actual
-          # Esto generará algo como: 1.0.19-build.45
+          # Crear versión incremental: 1.0.0-build.45
+          # El número de build de GitHub siempre sube, así que la versión siempre será "más nueva"
           NEW_VERSION="$BASE_VERSION-build.${{ github.run_number }}"
           
-          # 3. Aplicar el cambio al package.json sin crear un tag de git
           npm version $NEW_VERSION --no-git-tag-version
-          
-          echo "La versión para esta compilación es: $NEW_VERSION"
+          echo "BUILD_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          echo "Nueva versión detectada: $NEW_VERSION"
 
-      # 2. Descargar el artefacto EXACTO usando el run_id enviado por el repo WEB
-      - name: Download Frontend Artifact (From Dispatch)
-        if: github.event_name == 'repository_dispatch'
+      # 2. DESCARGA DEL FRONTEND DESDE EL REPO WEB
+      - name: Download Frontend Artifact
         uses: dawidd6/action-download-artifact@v6
         with:
           github_token: ${{ secrets.ACTION_TOKEN }}
           workflow: main.yml
+          # Usamos el ID de ejecución que nos envía el repo WEB
           run_id: ${{ github.event.client_payload.run_id }}
           name: frontend-dist
           repo: Grupo-2-DPM/DeepSaffix-WEB
           path: dist
-
-      # 3. Descargar el último artefacto disponible (Fallback si creas un Tag manual 'v1.x.x')
-      - name: Download Frontend Artifact (Manual Tag)
-        if: github.event_name == 'push'
-        uses: dawidd6/action-download-artifact@v6
-        with:
-          github_token: ${{ secrets.ACTION_TOKEN }}
-          workflow: main.yml
-          name: frontend-dist
-          repo: Grupo-2-DPM/DeepSaffix-WEB
-          path: dist
-        continue-on-error: true
+        # Si por alguna razón falla el dispatch, intenta bajar el último exitoso
+        continue-on-error: true 
 
       - name: Install Dependencies
         run: npm install
 
-      # 4. Construir y Publicar
+      - name: Compile TypeScript/Assets
+        run: npm run compile
+
+      # 3. CONSTRUCCIÓN Y PUBLICACIÓN COMO "LATEST"
       - name: Build and Publish Electron
         run: |
-          npm run compile
-          npx electron-builder ${{ matrix.target }} --publish always
+          # --publish always: Sube los archivos a GitHub
+          # -c.publish.releaseType=release: Publica la release inmediatamente (no queda en Draft)
+          # -c.generateUpdatesFilesForAllChannels=true: Asegura que el auto-updater funcione
+          npx electron-builder ${{ matrix.target }} \
+            --publish always \
+            -c.publish.releaseType=release \
+            -c.publish.update-info-filename=latest.yml
         env:
           GH_TOKEN: ${{ secrets.ACTION_TOKEN }}
+
+      # 4. (OPCIONAL) SUBIR BINARIOS COMO ARTEFACTOS DE ACCIÓN
+      - name: Upload Binaries to Actions
+        uses: actions/upload-artifact@v4
+        with:
+          name: DeepSaffix-Binaries-${{ matrix.os }}
+          path: release/*.${{ matrix.os == 'windows-latest' && 'exe' || 'AppImage' }}
