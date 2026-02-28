@@ -14,7 +14,7 @@ jobs:
   build-and-deploy:
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false # Para que si falla Linux, Windows siga compilando
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -25,8 +25,6 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -34,35 +32,39 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      # 1. ACTUALIZACIÓN AUTOMÁTICA DE VERSIÓN (OPCIÓN 1 PROFESIONAL)
-      # Esto evita que tengas que cambiar el package.json a mano.
-      # Usamos la fecha y el run_number para asegurar que siempre sea mayor a la anterior.
+      # 1. VERSIONAMIENTO DINÁMICO REFORZADO
       - name: Auto-update Version
+        id: vars
         shell: bash
         run: |
-          # Extraer versión base (ej: 1.0.0)
+          # 1. Extraer versión base
           BASE_VERSION=$(node -p "require('./package.json').version.split('-')[0]")
-          # Crear versión incremental: 1.0.0-build.45
-          # El número de build de GitHub siempre sube, así que la versión siempre será "más nueva"
-          NEW_VERSION="$BASE_VERSION-build.${{ github.run_number }}"
           
-          npm version $NEW_VERSION --no-git-tag-version
-          echo "BUILD_VERSION=$NEW_VERSION" >> $GITHUB_ENV
-          echo "Nueva versión detectada: $NEW_VERSION"
+          # 2. Crear versión con el run_number para que sea SIEMPRE incremental
+          # Ejemplo: 1.0.19.45 (Windows prefiere puntos, Linux acepta guiones)
+          NEW_VERSION="${BASE_VERSION}.${{ github.run_number }}"
+          
+          # 3. Debug: Escribir en el log de la Action para ver qué pasa
+          echo "------------------------------------------"
+          echo "DEBUG: Versión Base detectada: $BASE_VERSION"
+          echo "DEBUG: Nueva Versión calculada: $NEW_VERSION"
+          echo "------------------------------------------"
+          
+          # 4. Aplicar al package.json
+          npm version $NEW_VERSION --no-git-tag-version --allow-same-version
+          
+          # 5. Guardar como variable de entorno para el siguiente paso
+          echo "FINAL_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
-      # 2. DESCARGA DEL FRONTEND DESDE EL REPO WEB
       - name: Download Frontend Artifact
         uses: dawidd6/action-download-artifact@v6
         with:
           github_token: ${{ secrets.ACTION_TOKEN }}
           workflow: main.yml
-          # Usamos el ID de ejecución que nos envía el repo WEB
           run_id: ${{ github.event.client_payload.run_id }}
           name: frontend-dist
           repo: Grupo-2-DPM/DeepSaffix-WEB
           path: dist
-        # Si por alguna razón falla el dispatch, intenta bajar el último exitoso
-        continue-on-error: true 
 
       - name: Install Dependencies
         run: npm install
@@ -70,14 +72,17 @@ jobs:
       - name: Compile TypeScript/Assets
         run: npm run compile
 
-      # 3. CONSTRUCCIÓN Y PUBLICACIÓN COMO "LATEST"
+      # 3. CONSTRUCCIÓN Y PUBLICACIÓN FORZADA
       - name: Build and Publish Electron
+        shell: bash
         run: |
-          # --publish always: Sube los archivos a GitHub
-          # -c.publish.releaseType=release: Publica la release inmediatamente (no queda en Draft)
-          # -c.generateUpdatesFilesForAllChannels=true: Asegura que el auto-updater funcione
+          echo "Iniciando build para versión: ${{ env.FINAL_VERSION }}"
+          
+          # Forzamos la versión mediante el argumento -c.extraMetadata.version
+          # Esto sobreescribe cualquier cosa que diga el package.json físico
           npx electron-builder ${{ matrix.target }} \
             --publish always \
+            -c.extraMetadata.version=${{ env.FINAL_VERSION }} \
             -c.publish.releaseType=release \
             -c.publish.update-info-filename=latest.yml
         env:
