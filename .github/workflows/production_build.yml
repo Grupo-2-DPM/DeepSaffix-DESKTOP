@@ -32,28 +32,26 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      # 1. VERSIONAMIENTO DINÁMICO REFORZADO
       - name: Auto-update Version
         id: vars
         shell: bash
         run: |
-          # 1. Extraer versión base
+          # 1. Extraer versión base (ej: 1.0.0)
           BASE_VERSION=$(node -p "require('./package.json').version.split('-')[0]")
           
-          # 2. Crear versión con el run_number para que sea SIEMPRE incremental
-          # Ejemplo: 1.0.19.45 (Windows prefiere puntos, Linux acepta guiones)
-          NEW_VERSION="${BASE_VERSION}.${{ github.run_number }}"
+          # 2. USAR GUION en lugar de punto para el build
+          # Esto genera: 1.0.0-build.13 (Formato válido para NPM)
+          NEW_VERSION="${BASE_VERSION}-build.${{ github.run_number }}"
           
-          # 3. Debug: Escribir en el log de la Action para ver qué pasa
           echo "------------------------------------------"
           echo "DEBUG: Versión Base detectada: $BASE_VERSION"
           echo "DEBUG: Nueva Versión calculada: $NEW_VERSION"
           echo "------------------------------------------"
           
-          # 4. Aplicar al package.json
+          # 3. Aplicar al package.json (Ahora no dará error)
           npm version $NEW_VERSION --no-git-tag-version --allow-same-version
           
-          # 5. Guardar como variable de entorno para el siguiente paso
+          # 4. Guardar para los siguientes pasos
           echo "FINAL_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
       - name: Download Frontend Artifact
