@@ -1,26 +1,16 @@
-name: DeepSaffix Nexus - Production Build (Auto-Latest)
+name: DeepSaffix Production Build
 
 on:
   repository_dispatch:
     types: [frontend-updated]
-  push:
-    tags:
-      - 'v*'
-
-permissions:
-  contents: write
+  workflow_dispatch: # Permite ejecutarlo a mano para probar
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-latest
-            target: --linux
-          - os: windows-latest
-            target: --win
+        os: [ubuntu-latest, windows-latest]
 
     steps:
       - name: Checkout Code
@@ -32,29 +22,8 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      - name: Auto-update Version
-        id: vars
-        shell: bash
-        run: |
-          # 1. Extraer versión base (ej: 1.0.0)
-          BASE_VERSION=$(node -p "require('./package.json').version.split('-')[0]")
-          
-          # 2. USAR GUION en lugar de punto para el build
-          # Esto genera: 1.0.0-build.13 (Formato válido para NPM)
-          NEW_VERSION="${BASE_VERSION}-build.${{ github.run_number }}"
-          
-          echo "------------------------------------------"
-          echo "DEBUG: Versión Base detectada: $BASE_VERSION"
-          echo "DEBUG: Nueva Versión calculada: $NEW_VERSION"
-          echo "------------------------------------------"
-          
-          # 3. Aplicar al package.json (Ahora no dará error)
-          npm version $NEW_VERSION --no-git-tag-version --allow-same-version
-          
-          # 4. Guardar para los siguientes pasos
-          echo "FINAL_VERSION=$NEW_VERSION" >> $GITHUB_ENV
-
-      - name: Download Frontend Artifact
+      # Paso 1: Descargar el frontend actualizado
+      - name: Download Frontend
         uses: dawidd6/action-download-artifact@v6
         with:
           github_token: ${{ secrets.ACTION_TOKEN }}
@@ -67,21 +36,20 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Compile TypeScript/Assets
-        run: npm run compile
-
-      # 3. CONSTRUCCIÓN Y PUBLICACIÓN FORZADA
-      - name: Build and Publish Electron
+      # Paso 2: Crear versión única automática (basada en tu 1.0.0)
+      - name: Set Version
         shell: bash
         run: |
-          echo "Iniciando build para versión: ${{ env.FINAL_VERSION }}"
-          
-          # Forzamos la versión mediante el argumento -c.extraMetadata.version
-          # Esto sobreescribe cualquier cosa que diga el package.json físico
-          npx electron-builder ${{ matrix.target }} \
-            --publish always \
-            -c.extraMetadata.version=${{ env.FINAL_VERSION }} \
-            -c.publish.releaseType=release \
-            -c.publish.update-info-filename=latest.yml
+          # Esto convierte 1.0.0 en 1.0.0-build.15 (por ejemplo)
+          VERSION=$(node -p "require('./package.json').version")
+          FINAL_VERSION="${VERSION}-build.${{ github.run_number }}"
+          echo "APP_VERSION=$FINAL_VERSION" >> $GITHUB_ENV
+          npm version $FINAL_VERSION --no-git-tag-version
+
+      # Paso 3: Compilar y Publicar
+      - name: Build and Publish
+        run: |
+          npm run compile
+          npx electron-builder --${{ matrix.os == 'windows-latest' && 'win' || 'linux' }} --publish always
         env:
           GH_TOKEN: ${{ secrets.ACTION_TOKEN }}
