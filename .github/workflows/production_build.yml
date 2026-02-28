@@ -30,17 +30,21 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-
-      # 1. Crear una versión única si esto viene del Frontend (Dispatch)
-      # Esto evita que electron-builder falle por intentar publicar versiones duplicadas
-      - name: Set Dynamic Version (Only for Dispatch)
-        if: github.event_name == 'repository_dispatch'
+      # --- ESTE ES EL PASO CLAVE ---
+      - name: Auto-update Version in package.json
         shell: bash
         run: |
-          # Extraemos la versión actual del package.json y le añadimos un sufijo con el número de ejecución
-          VERSION=$(node -p "require('./package.json').version")
-          npm version $VERSION-beta.${{ github.run_number }} --no-git-tag-version
-          echo "Building new beta release: $VERSION-beta.${{ github.run_number }}"
+          # 1. Extraer la versión base (ej. 1.0.19)
+          BASE_VERSION=$(node -p "require('./package.json').version.split('-')[0]")
+          
+          # 2. Crear una nueva versión usando el ID de la ejecución actual
+          # Esto generará algo como: 1.0.19-build.45
+          NEW_VERSION="$BASE_VERSION-build.${{ github.run_number }}"
+          
+          # 3. Aplicar el cambio al package.json sin crear un tag de git
+          npm version $NEW_VERSION --no-git-tag-version
+          
+          echo "La versión para esta compilación es: $NEW_VERSION"
 
       # 2. Descargar el artefacto EXACTO usando el run_id enviado por el repo WEB
       - name: Download Frontend Artifact (From Dispatch)
