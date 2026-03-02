@@ -20,7 +20,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          cache: "npm"
 
       # Paso 1: Descargar el frontend actualizado
       - name: Download Frontend
@@ -33,6 +33,10 @@ jobs:
           repo: Grupo-2-DPM/DeepSaffix-WEB
           path: dist
 
+      - name: Debug folder
+        shell: bash
+        run: ls -R
+        
       - name: Install Dependencies
         run: npm install
 
