@@ -35,25 +35,29 @@ jobs:
 
       - name: Debug folder
         shell: bash
-        run: ls -R
-        
+        run: ls -R dist # Verificamos que el dist descargado está ahí
+
       - name: Install Dependencies
         run: npm install
 
-      # Paso 2: Crear versión única automática (basada en tu 1.0.0)
-      - name: Set Version
+      - name: Set Version and Push Tag
         shell: bash
-        run: |
-          # Esto convierte 1.0.0 en 1.0.0-build.15 (por ejemplo)
-          VERSION=$(node -p "require('./package.json').version")
-          FINAL_VERSION="${VERSION}-build.${{ github.run_number }}"
-          echo "APP_VERSION=$FINAL_VERSION" >> $GITHUB_ENV
-          npm version $FINAL_VERSION --no-git-tag-version
-
-      # Paso 3: Compilar y Publicar
-      - name: Build and Publish
-        run: |
-          npm run compile
-          npx electron-builder --${{ matrix.os == 'windows-latest' && 'win' || 'linux' }} --publish always
         env:
-          GH_TOKEN: ${{ secrets.ACTION_TOKEN }}
+          # Usamos el token para tener permisos de escritura
+          GITHUB_TOKEN: ${{ secrets.ACTION_TOKEN }}
+        run: |
+          # 1. Configurar Git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # 2. Calcular nueva versión (Ej: 1.0.0-build.15)
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          NEW_VERSION="${PACKAGE_VERSION}-build.${{ github.run_number }}"
+          
+          # 3. Actualizar package.json y crear el TAG
+          # El comando 'npm version' crea un commit y un tag automáticamente
+          npm version $NEW_VERSION -m "Release version $NEW_VERSION [skip ci]"
+          
+          # 4. Push de los cambios y el tag
+          # Usamos la URL con el token para asegurar permisos
+          git push origin main --follow-tags
