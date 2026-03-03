@@ -3,26 +3,23 @@ name: DeepSaffix Production Build
 on:
   repository_dispatch:
     types: [frontend-updated]
-  workflow_dispatch: # Permite ejecutarlo a mano para probar
+  workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-
+  prepare-release:
+    runs-on: ubuntu-latest # Solo necesitamos uno
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.ACTION_TOKEN }} # CRUCIAL: Usar PAT para que el push dispare el siguiente workflow
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "npm"
 
-      # Paso 1: Descargar el frontend actualizado
       - name: Download Frontend
         uses: dawidd6/action-download-artifact@v6
         with:
@@ -33,33 +30,24 @@ jobs:
           repo: Grupo-2-DPM/DeepSaffix-WEB
           path: dist
 
-      - name: Debug folder
-        shell: bash
-        run: ls -R dist # Verificamos que el dist descargado está ahí
-
       - name: Install Dependencies
         run: npm install
 
       - name: Set Version and Push Tag
         shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.ACTION_TOKEN }}
         run: |
-          # 1. Configurar Git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Evitar problemas de CRLF en Windows si hubiera archivos de texto
+          git config core.autocrlf false
 
-          # 2. Forzar el 'stage' de los archivos descargados en 'dist'
-          # Esto le dice a Git que estos cambios son parte de la nueva versión
           git add dist/ -f 
-
-          # 3. Calcular versión
+          
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
           NEW_VERSION="v${PACKAGE_VERSION}-build.${{ github.run_number }}"
           
-          # 4. Actualizar versión y crear COMMIT + TAG
-          # Usamos --force para que ignore si el directorio no estaba "limpio"
+          # npm version creará el commit con el 'dist' y el tag
           npm version $NEW_VERSION -m "Release $NEW_VERSION [skip ci]" --force
           
-          # 5. Push al repositorio (esto activará el segundo workflow)
           git push origin main --follow-tags
