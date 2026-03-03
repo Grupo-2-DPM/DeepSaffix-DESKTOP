@@ -1,18 +1,24 @@
-name: DeepSaffix Production Build
+name: DeepSaffix Full Production Release
 
 on:
   repository_dispatch:
     types: [frontend-updated]
-  workflow_dispatch:
+  workflow_dispatch: # Para pruebas manuales
 
 jobs:
-  prepare-release:
-    runs-on: ubuntu-latest
+  prepare-and-publish:
+    # Ejecutamos la preparación en Ubuntu, y luego la matriz para compilar
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Aquí definimos los dos sistemas operativos de una vez
+        os: [ubuntu-latest, windows-latest]
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          # Usar el token aquí es lo que permite que el push dispare otros workflows
           token: ${{ secrets.ACTION_TOKEN }}
           fetch-depth: 0
 
@@ -20,7 +26,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'npm'
 
+      # 1. Descargar el frontend (Ambos runners lo necesitan para compilar)
       - name: Download Frontend
         uses: dawidd6/action-download-artifact@v6
         with:
@@ -34,27 +42,32 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Set Version and Push Tag
+      # 2. Sincronizar Versión (Limpia el build.X anterior y pone el nuevo)
+      - name: Set Version
         shell: bash
         run: |
-          # 1. Configurar Git
+          BASE_VERSION=$(node -p "require('./package.json').version.split('-')[0]")
+          FINAL_VERSION="${BASE_VERSION}-build.${{ github.run_number }}"
+          echo "APP_VERSION=$FINAL_VERSION" >> $GITHUB_ENV
+          npm version $FINAL_VERSION --no-git-tag-version
+
+      # 3. Compilar (Electron Builder usará el 'dist' que descargamos)
+      - name: Build and Publish
+        run: |
+          npm run compile
+          npx electron-builder --${{ matrix.os == 'windows-latest' && 'win' || 'linux' }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.ACTION_TOKEN }}
+
+      # 4. Solo el runner de Ubuntu se encarga de subir el tag al repo 
+      # para que quede constancia histórica (opcional pero recomendado)
+      - name: Push Version Tag to Repo
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # 2. Limpiar la versión para evitar el build.25-build.26
-          # Extraemos solo X.Y.Z ignorando cualquier cosa después del guion
-          BASE_VERSION=$(node -p "require('./package.json').version.split('-')[0]")
-          NEW_VERSION="v${BASE_VERSION}-build.${{ github.run_number }}"
-          
-          echo "Nueva versión calculada: $NEW_VERSION"
-
-          # 3. Preparar archivos
           git add dist/ -f
-          
-          # 4. Actualizar package.json y crear commit/tag
-          # --force para ignorar el directorio sucio
-          npm version $NEW_VERSION -m "Release $NEW_VERSION [skip ci]" --force
-          
-          # 5. Push explícito de la rama y los tags
-          # Usamos la sintaxis con el token en la URL para asegurar que GitHub lo reconozca como evento externo
-          git push https://x-access-token:${{ secrets.ACTION_TOKEN }}@github.com/${{ github.repository }}.git main --follow-tags
+          git commit -m "Release ${{ env.APP_VERSION }} [skip ci]" || echo "No changes to commit"
+          git tag v${{ env.APP_VERSION }}
+          git push origin main --tags
