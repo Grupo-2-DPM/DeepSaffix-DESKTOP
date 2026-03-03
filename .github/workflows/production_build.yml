@@ -43,21 +43,23 @@ jobs:
       - name: Set Version and Push Tag
         shell: bash
         env:
-          # Usamos el token para tener permisos de escritura
           GITHUB_TOKEN: ${{ secrets.ACTION_TOKEN }}
         run: |
           # 1. Configurar Git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # 2. Calcular nueva versión (Ej: 1.0.0-build.15)
+          # 2. Forzar el 'stage' de los archivos descargados en 'dist'
+          # Esto le dice a Git que estos cambios son parte de la nueva versión
+          git add dist/ -f 
+
+          # 3. Calcular versión
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          NEW_VERSION="${PACKAGE_VERSION}-build.${{ github.run_number }}"
+          NEW_VERSION="v${PACKAGE_VERSION}-build.${{ github.run_number }}"
           
-          # 3. Actualizar package.json y crear el TAG
-          # El comando 'npm version' crea un commit y un tag automáticamente
-          npm version $NEW_VERSION -m "Release version $NEW_VERSION [skip ci]"
+          # 4. Actualizar versión y crear COMMIT + TAG
+          # Usamos --force para que ignore si el directorio no estaba "limpio"
+          npm version $NEW_VERSION -m "Release $NEW_VERSION [skip ci]" --force
           
-          # 4. Push de los cambios y el tag
-          # Usamos la URL con el token para asegurar permisos
+          # 5. Push al repositorio (esto activará el segundo workflow)
           git push origin main --follow-tags
