@@ -1,42 +1,85 @@
-name: Manual Tag Release
+# .github/workflows/electron-release.yml
+# En: Grupo-2-DPM/DeepSaffix-DESKTOP
+# Propósito: Empaquetar y publicar en GitHub Releases
+# Se dispara SOLO cuando el Workflow 1 crea un tag → garantiza que dist está listo
+
+name: Electron Release
 
 on:
   push:
     tags:
-      - 'v*'
+      - 'v[0-9]*.[0-9]*.[0-9]*-build.*'  # Solo tags de release, ej: v1.0.0-build.29
 
 jobs:
-  manual-build:
+  build-and-publish:
+    name: Build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest] # Aquí sí compilas para ambos
+        os: [ubuntu-latest, windows-latest]
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Code at Tag
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Para traer el commit que incluye el 'dist'
+          # Checkout del commit exacto al que apunta el tag
+          # En este punto, dist/ ya está en el repo (lo commiteó el Workflow 1)
+          ref: ${{ github.ref }}
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22   # ← corrige el EBADENGINE warning de @electron/rebuild
           cache: 'npm'
 
-      - name: Sync version with Tag
+      # Extrae la versión directamente del tag para máxima coherencia
+      - name: Extract Version from Tag
+        id: tag_version
         shell: bash
         run: |
-          TAG_VERSION=${GITHUB_REF#refs/tags/v}
-          npm version $TAG_VERSION --no-git-tag-version --allow-same-version
+          TAG="${{ github.ref_name }}"          # ej: v1.0.0-build.29
+          VERSION="${TAG#v}"                    # ej: 1.0.0-build.29
+          
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "▶ Empaquetando versión: ${VERSION}"
 
-      - name: Install and Compile
-        run: |
-          npm install
-          npm run compile
+      - name: Install Dependencies
+        run: npm install
 
-      - name: Build and Publish
+      # Sincroniza package.json con la versión del tag
+      # (ya debería estar correcto, pero esto lo garantiza)
+      - name: Sync Version with Tag
+        shell: bash
         run: |
-          npx electron-builder --${{ matrix.os == 'windows-latest' && 'win' || 'linux' }} --publish always
+          npm version ${{ steps.tag_version.outputs.version }} \
+            --no-git-tag-version \
+            --allow-same-version
+
+      - name: Compile TypeScript
+        run: npm run compile
+
+      # Electron Builder detecta el OS del runner y empaqueta para el target correcto
+      - name: Package & Publish
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            npx electron-builder --win --publish always
+          else
+            npx electron-builder --linux --publish always
+          fi
         env:
           GH_TOKEN: ${{ secrets.ACTION_TOKEN }}
+
+      - name: Summary
+        shell: bash
+        run: |
+          echo "### ✅ Build Completado" >> $GITHUB_STEP_SUMMARY
+          echo "- **OS**: \`${{ matrix.os }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Versión**: \`${{ steps.tag_version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Publicado en**: [GitHub Releases](https://github.com/Grupo-2-DPM/DeepSaffix-DESKTOP/releases/tag/${{ steps.tag_version.outputs.tag }})" >> $GITHUB_STEP_SUMMARY

@@ -1,19 +1,23 @@
-name: DeepSaffix Full Production Release
+# .github/workflows/release-trigger.yml
+# En: Grupo-2-DPM/DeepSaffix-DESKTOP
+# Propósito: Recibir el frontend, preparar dist, crear tag → dispara el build de Electron
+
+name: Prepare Release
 
 on:
   repository_dispatch:
     types: [frontend-updated]
-  workflow_dispatch: # Para pruebas manuales
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Run ID del workflow de frontend (dejar vacío para usar el último)'
+        required: false
 
 jobs:
-  prepare-and-publish:
-    # Ejecutamos la preparación en Ubuntu, y luego la matriz para compilar
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        # Aquí definimos los dos sistemas operativos de una vez
-        os: [ubuntu-latest, windows-latest]
+  prepare-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # necesario para push de tags
 
     steps:
       - name: Checkout Code
@@ -28,46 +32,90 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      # 1. Descargar el frontend (Ambos runners lo necesitan para compilar)
-      - name: Download Frontend
+      # Resuelve el run_id: desde el payload, input manual, o el último exitoso
+      - name: Resolve Frontend Run ID
+        id: resolve_run
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.ACTION_TOKEN }}
+          script: |
+            // Prioridad: payload > input manual > último exitoso
+            let runId = context.payload.client_payload?.run_id
+                     || context.payload.inputs?.run_id;
+
+            if (!runId) {
+              const runs = await github.rest.actions.listWorkflowRuns({
+                owner: 'Grupo-2-DPM',
+                repo: 'DeepSaffix-WEB',
+                workflow_id: 'main.yml',
+                status: 'success',
+                per_page: 1
+              });
+              runId = runs.data.workflow_runs[0]?.id;
+              if (!runId) core.setFailed('No se encontró ningún run exitoso del frontend');
+            }
+
+            console.log(`Using frontend run_id: ${runId}`);
+            core.setOutput('run_id', runId);
+
+      - name: Download Frontend Artifact
         uses: dawidd6/action-download-artifact@v6
         with:
           github_token: ${{ secrets.ACTION_TOKEN }}
           workflow: main.yml
-          run_id: ${{ github.event.client_payload.run_id }}
+          run_id: ${{ steps.resolve_run.outputs.run_id }}
           name: frontend-dist
           repo: Grupo-2-DPM/DeepSaffix-WEB
           path: dist
 
-      - name: Install Dependencies
-        run: npm install
+      - name: Install Dependencies (solo para leer package.json)
+        run: npm install --ignore-scripts
 
-      # 2. Sincronizar Versión (Limpia el build.X anterior y pone el nuevo)
-      - name: Set Version
-        shell: bash
+      # Calcula la versión incrementando el build number de forma determinista
+      - name: Calculate Next Version
+        id: versioning
         run: |
           BASE_VERSION=$(node -p "require('./package.json').version.split('-')[0]")
-          FINAL_VERSION="${BASE_VERSION}-build.${{ github.run_number }}"
-          echo "APP_VERSION=$FINAL_VERSION" >> $GITHUB_ENV
-          npm version $FINAL_VERSION --no-git-tag-version
+          NEXT_BUILD=${{ github.run_number }}
+          FINAL_VERSION="${BASE_VERSION}-build.${NEXT_BUILD}"
+          
+          echo "APP_VERSION=${FINAL_VERSION}" >> $GITHUB_ENV
+          echo "version=${FINAL_VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=v${FINAL_VERSION}" >> $GITHUB_OUTPUT
+          
+          echo "▶ Versión calculada: ${FINAL_VERSION}"
 
-      # 3. Compilar (Electron Builder usará el 'dist' que descargamos)
-      - name: Build and Publish
-        run: |
-          npm run compile
-          npx electron-builder --${{ matrix.os == 'windows-latest' && 'win' || 'linux' }} --publish always
-        env:
-          GH_TOKEN: ${{ secrets.ACTION_TOKEN }}
+      # Actualiza package.json con la nueva versión
+      - name: Bump package.json Version
+        run: npm version ${{ steps.versioning.outputs.version }} --no-git-tag-version
 
-      # 4. Solo el runner de Ubuntu se encarga de subir el tag al repo 
-      # para que quede constancia histórica (opcional pero recomendado)
-      - name: Push Version Tag to Repo
-        if: matrix.os == 'ubuntu-latest'
-        shell: bash
+      # Commit del dist + package.json actualizado, luego crea el tag
+      # El tag es lo que dispara el workflow de Electron
+      - name: Commit dist & Create Release Tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add dist/ -f
-          git commit -m "Release ${{ env.APP_VERSION }} [skip ci]" || echo "No changes to commit"
-          git tag v${{ env.APP_VERSION }}
-          git push origin main --tags
+
+          git add dist/ package.json package-lock.json -f
+
+          # Solo hace commit si hay cambios reales
+          if git diff --staged --quiet; then
+            echo "ℹ Sin cambios en dist, solo se creará el tag"
+          else
+            git commit -m "chore(release): dist actualizado para ${{ steps.versioning.outputs.version }} [skip ci]"
+            git push origin main
+          fi
+
+          # El tag es el "disparador oficial" del empaquetado de Electron
+          git tag ${{ steps.versioning.outputs.tag }}
+          git push origin ${{ steps.versioning.outputs.tag }}
+          
+          echo "✅ Tag ${{ steps.versioning.outputs.tag }} publicado → Electron build iniciará automáticamente"
+
+      - name: Summary
+        run: |
+          echo "### 🚀 Release Preparado" >> $GITHUB_STEP_SUMMARY
+          echo "- **Versión**: \`${{ steps.versioning.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag**: \`${{ steps.versioning.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Frontend Run ID**: \`${{ steps.resolve_run.outputs.run_id }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Siguiente paso**: Electron build se disparó automáticamente" >> $GITHUB_STEP_SUMMARY
