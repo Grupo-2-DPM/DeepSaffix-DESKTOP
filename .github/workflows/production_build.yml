@@ -7,12 +7,13 @@ on:
 
 jobs:
   prepare-release:
-    runs-on: ubuntu-latest # Solo necesitamos uno
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.ACTION_TOKEN }} # CRUCIAL: Usar PAT para que el push dispare el siguiente workflow
+          # Usar el token aquí es lo que permite que el push dispare otros workflows
+          token: ${{ secrets.ACTION_TOKEN }}
           fetch-depth: 0
 
       - name: Setup Node.js
@@ -36,18 +37,24 @@ jobs:
       - name: Set Version and Push Tag
         shell: bash
         run: |
+          # 1. Configurar Git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Evitar problemas de CRLF en Windows si hubiera archivos de texto
-          git config core.autocrlf false
+          # 2. Limpiar la versión para evitar el build.25-build.26
+          # Extraemos solo X.Y.Z ignorando cualquier cosa después del guion
+          BASE_VERSION=$(node -p "require('./package.json').version.split('-')[0]")
+          NEW_VERSION="v${BASE_VERSION}-build.${{ github.run_number }}"
+          
+          echo "Nueva versión calculada: $NEW_VERSION"
 
-          git add dist/ -f 
+          # 3. Preparar archivos
+          git add dist/ -f
           
-          PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          NEW_VERSION="v${PACKAGE_VERSION}-build.${{ github.run_number }}"
-          
-          # npm version creará el commit con el 'dist' y el tag
+          # 4. Actualizar package.json y crear commit/tag
+          # --force para ignorar el directorio sucio
           npm version $NEW_VERSION -m "Release $NEW_VERSION [skip ci]" --force
           
-          git push origin main --follow-tags
+          # 5. Push explícito de la rama y los tags
+          # Usamos la sintaxis con el token en la URL para asegurar que GitHub lo reconozca como evento externo
+          git push https://x-access-token:${{ secrets.ACTION_TOKEN }}@github.com/${{ github.repository }}.git main --follow-tags
